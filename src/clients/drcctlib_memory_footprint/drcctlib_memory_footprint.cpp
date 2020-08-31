@@ -72,18 +72,18 @@ DoWhatClientWantTodo(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t 
     if(strlen(full_cct->file_path) != 0) {
         cout << " Current Func: " << full_cct->func_name
              << " Context: " << full_cct->ctxt_hndl << " ASM: " << full_cct->code_asm
-             << endl;
+             << full_cct->line_no << full_cct->ip << endl;
         cout << " Pre Func: " << full_cct->pre_ctxt->func_name
              << " Context: " << full_cct->pre_ctxt->ctxt_hndl << " ASM: " << full_cct->pre_ctxt->code_asm
              << endl;
 
-//        for (long unsigned int j = 0; j < ref->size; j++) {
-//            app_pc addr = ref->addr;
-//            const char * p = reinterpret_cast< const char *>(addr);
-//            for (unsigned int i = sizeof(addr); i > 0; i--) {
-//                std::cout << hex << int(p[i-1]);
-//            }
-//            cout << endl;
+        for (long unsigned int j = 0; j < ref->size; j++) {
+            app_pc addr = ref->addr;
+            const char * p = reinterpret_cast< const char *>(addr);
+            for (unsigned int i = sizeof(addr); i > 0; i--) {
+                std::cout << hex << int(p[i-1]);
+            }
+            cout << endl;
 //            //ref->addr+=1;
 
 
