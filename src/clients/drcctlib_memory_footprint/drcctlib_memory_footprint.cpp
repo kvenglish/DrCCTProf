@@ -5,12 +5,19 @@
  */
 
 #include <cstddef>
+#include <iostream>
+#include <list>
+#include <map>
+#include <regex>
+#include <string>
+using namespace std;
 
 #include "dr_api.h"
 #include "drmgr.h"
 #include "drreg.h"
 #include "drutil.h"
 #include "drcctlib.h"
+
 
 #define DRCCTLIB_PRINTF(format, args...) \
     DRCCTLIB_PRINTF_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, ##args)
@@ -45,15 +52,47 @@ typedef struct _per_thread_t {
     void *cur_buf;
 } per_thread_t;
 
+typedef struct _mem_map {
+    char *func;
+    map<context_handle_t,list<app_pc , int>> context_map;
+
+} mem_map;
+
+map <char*, char*> testmap;
 #define TLS_MEM_REF_BUFF_SIZE 100
 
 // client want to do
 void
 DoWhatClientWantTodo(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
 {
-   system.out.println(ref->size + " " + ref->addr)
-    
-}
+    context_t* full_cct = drcctlib_get_full_cct(cur_ctxt_hndl, 0);
+
+
+    //cout << " Current Func: " << full_cct->func_name << " Path: " << full_cct->file_path << " Context: " << full_cct->ctxt_hndl << " IP: " << full_cct->ip << endl;
+    if(strlen(full_cct->file_path) != 0) {
+        cout << " Current Func: " << full_cct->func_name
+             << " Context: " << full_cct->ctxt_hndl << " ASM: " << full_cct->code_asm
+             << endl;
+        cout << " Pre Func: " << full_cct->pre_ctxt->func_name
+             << " Context: " << full_cct->pre_ctxt->ctxt_hndl << " ASM: " << full_cct->pre_ctxt->code_asm
+             << endl;
+
+//        for (long unsigned int j = 0; j < ref->size; j++) {
+//            app_pc addr = ref->addr;
+//            const char * p = reinterpret_cast< const char *>(addr);
+//            for (unsigned int i = sizeof(addr); i > 0; i--) {
+//                std::cout << hex << int(p[i-1]);
+//            }
+//            cout << endl;
+//            //ref->addr+=1;
+
+
+
+        }
+    }
+
+   
+
 // dr clean call
 void
 InsertCleancall(int32_t slot,int32_t num)
@@ -189,6 +228,10 @@ static void
 ClientExit(void)
 {
     // add output module here
+    cout << testmap.size();
+    for(auto elem : testmap){
+        cout << elem.first << " " << elem.second;
+    }
     drcctlib_exit();
 
     if (!dr_raw_tls_cfree(tls_offs, INSTRACE_TLS_COUNT)) {
