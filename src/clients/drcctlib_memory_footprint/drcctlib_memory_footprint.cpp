@@ -1,15 +1,18 @@
-/* 
+/*
  *  Copyright (c) 2020 Xuhpclab. All rights reserved.
  *  Licensed under the MIT License.
  *  See LICENSE file for more information.
  */
 
 #include <cstddef>
-#include <iostream>
 #include <list>
+#include <iostream>
 #include <map>
-#include <regex>
 #include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
 using namespace std;
 
 #include "dr_api.h"
@@ -18,12 +21,11 @@ using namespace std;
 #include "drutil.h"
 #include "drcctlib.h"
 
-
 #define DRCCTLIB_PRINTF(format, args...) \
     DRCCTLIB_PRINTF_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, ##args)
-#define DRCCTLIB_EXIT_PROCESS(format, args...)                                           \
-    DRCCTLIB_CLIENT_EXIT_PROCESS_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, \
-                                          ##args)
+#define DRCCTLIB_EXIT_PROCESS(format, args...)                                       \
+    DRCCTLIB_CLIENT_EXIT_PROCESS_TEMPLATE("memory_with_addr_and_refsize_clean_call", \
+                                          format, ##args)
 
 static int tls_idx;
 
@@ -52,50 +54,77 @@ typedef struct _per_thread_t {
     void *cur_buf;
 } per_thread_t;
 
-typedef struct _mem_map {
+typedef struct _parent_map {
     char *func;
-    map<context_handle_t,list<app_pc , int>> context_map;
+    list<unsigned long> locs;
+    int32_t parent;
 
-} mem_map;
+} parent_map;
 
-map <char*, char*> testmap;
+map<int32_t, list<unsigned long>> calls;
+
+string divider = "================================================================================";
 #define TLS_MEM_REF_BUFF_SIZE 100
 
 // client want to do
 void
 DoWhatClientWantTodo(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
 {
-    context_t* full_cct = drcctlib_get_full_cct(cur_ctxt_hndl, 0);
+    // context_t *full_cct = drcctlib_get_full_cct(cur_ctxt_hndl, 0);
 
+    /*  //  cout << " Current Func: " << full_cct->func_name << " Path: " <<
+    full_cct->file_path << " Context: " << full_cct->ctxt_hndl << " IP: " << full_cct->ip
+    << endl;
 
-    //cout << " Current Func: " << full_cct->func_name << " Path: " << full_cct->file_path << " Context: " << full_cct->ctxt_hndl << " IP: " << full_cct->ip << endl;
-    if(strlen(full_cct->file_path) != 0) {
+        //     if (strlen(full_cct->file_path) != 0) {
         cout << " Current Func: " << full_cct->func_name
              << " Context: " << full_cct->ctxt_hndl << " ASM: " << full_cct->code_asm
-             << full_cct->line_no << full_cct->ip << endl;
+                  << " LN: " << full_cct->line_no << endl;//" IP: " << full_cct->ip <<
+    endl;
+
+    //
+    //  //  if (full_cct->pre_ctxt->ctxt_hndl != 0) {
+    //
+    //
         cout << " Pre Func: " << full_cct->pre_ctxt->func_name
-             << " Context: " << full_cct->pre_ctxt->ctxt_hndl << " ASM: " << full_cct->pre_ctxt->code_asm
-             << endl;
-
-        for (long unsigned int j = 0; j < ref->size; j++) {
-            app_pc addr = ref->addr;
-            const char * p = reinterpret_cast< const char *>(addr);
-            for (unsigned int i = sizeof(addr); i > 0; i--) {
-                std::cout << hex << int(p[i-1]);
-            }
-            cout << endl;
-//            //ref->addr+=1;
+             << " Context: " << full_cct->pre_ctxt->ctxt_hndl
+             << " ASM: " << full_cct->pre_ctxt->code_asm
+             << " LN: " << full_cct->pre_ctxt->line_no << endl;//" IP: " //<<
+    full_cct->pre_ctxt->ip
+             //<< endl;
+    }*/
 
 
+    list<unsigned long> mem;
+    unsigned long address = (unsigned long)ref->addr;
 
+    //    for(long unsigned int i = 0; i < ref->size; i++){
+    //        mem.push_front(address);
+    //        address++;
+    //    }
+    //
+    //    address -= ref->size;
+
+//    pair<map<int, list<unsigned long>>::iterator, bool> ret =
+//        calls.insert(make_pair(cur_ctxt_hndl, mem));
+
+    // if (ret.second == false){
+    // cout << "1";
+
+    for (long unsigned int i = 0; i < ref->size; i++) {
+        if (find(calls[cur_ctxt_hndl].begin(), calls[cur_ctxt_hndl].end(), address) ==
+            calls[cur_ctxt_hndl].end()) {
+            calls[cur_ctxt_hndl].push_front(address);
         }
+        address++;
     }
+}
 
-   
+// }
 
 // dr clean call
 void
-InsertCleancall(int32_t slot,int32_t num)
+InsertCleancall(int32_t slot, int32_t num)
 {
     void *drcontext = dr_get_current_drcontext();
     per_thread_t *pt = (per_thread_t *)drmgr_get_tls_field(drcontext, tls_idx);
@@ -137,15 +166,18 @@ InstrumentMem(void *drcontext, instrlist_t *ilist, instr_t *where, opnd_t ref)
     // store mem_ref_t->size
 #ifdef ARM_CCTLIB
     MINSERT(ilist, where,
-            XINST_CREATE_load_int(drcontext, opnd_create_reg(free_reg),
-                                  OPND_CREATE_CCT_INT(drutil_opnd_mem_size_in_bytes(ref, where))));
+            XINST_CREATE_load_int(
+                drcontext, opnd_create_reg(free_reg),
+                OPND_CREATE_CCT_INT(drutil_opnd_mem_size_in_bytes(ref, where))));
     MINSERT(ilist, where,
-            XINST_CREATE_store(drcontext, OPND_CREATE_MEMPTR(reg_mem_ref_ptr, offsetof(mem_ref_t, size)),
-                             opnd_create_reg(free_reg)));
+            XINST_CREATE_store(
+                drcontext, OPND_CREATE_MEMPTR(reg_mem_ref_ptr, offsetof(mem_ref_t, size)),
+                opnd_create_reg(free_reg)));
 #else
     MINSERT(ilist, where,
-            XINST_CREATE_store(drcontext, OPND_CREATE_MEMPTR(reg_mem_ref_ptr, offsetof(mem_ref_t, size)),
-                             OPND_CREATE_CCT_INT(drutil_opnd_mem_size_in_bytes(ref, where))));
+            XINST_CREATE_store(
+                drcontext, OPND_CREATE_MEMPTR(reg_mem_ref_ptr, offsetof(mem_ref_t, size)),
+                OPND_CREATE_CCT_INT(drutil_opnd_mem_size_in_bytes(ref, where))));
 #endif
 
 #ifdef ARM_CCTLIB
@@ -221,35 +253,113 @@ ClientThreadEnd(void *drcontext)
 static void
 ClientInit(int argc, const char *argv[])
 {
-    
+}
+
+static string addr_to_hex(unsigned long addr){
+    stringstream hex_addr;
+    hex_addr << "0x" << setfill('0') << setw(sizeof(addr)*2) << std::hex << addr;
+    return hex_addr.str();
 }
 
 static void
 ClientExit(void)
 {
     // add output module here
-    cout << testmap.size();
-    for(auto elem : testmap){
-        cout << elem.first << " " << elem.second;
-    }
-    drcctlib_exit();
+    //map<int32_t, list<unsigned long>>::iterator it = calls.begin();
 
-    if (!dr_raw_tls_cfree(tls_offs, INSTRACE_TLS_COUNT)) {
-        DRCCTLIB_EXIT_PROCESS(
-            "ERROR: drcctlib_memory_with_addr_and_refsize_clean_call dr_raw_tls_calloc fail");
+    for(auto& it : calls) {
+            context_t *full_cct = drcctlib_get_full_cct(it.first, 0);
+            //list<unsigned long>::iterator addr_it = it.second.begin();
+            context_t *parent = full_cct->pre_ctxt;
+            int parent_handle = full_cct->pre_ctxt->ctxt_hndl;
+            while(parent_handle != 0){
+
+            for(auto& addr_it : it.second) {
+                if (find(calls[parent_handle].begin(), calls[parent_handle].end(),
+                         addr_it) == calls[parent_handle].end()) {
+                    calls[parent_handle].push_front(addr_it);
+                }
+
+
+            }
+            if(parent_handle!=1) {
+                parent = parent->pre_ctxt;
+                parent_handle = parent->ctxt_hndl;
+            }
+            else{
+                parent_handle = 0;
+            }
+            //cout << "H: " << parent_handle;
+        }
     }
-    if (!drmgr_unregister_thread_init_event(ClientThreadStart) ||
-        !drmgr_unregister_thread_exit_event(ClientThreadEnd) ||
-        !drmgr_unregister_tls_field(tls_idx)) {
-        DRCCTLIB_PRINTF("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call failed to "
-                        "unregister in ClientExit");
+    //put size values into multimap for sorting
+    multimap<int, int32_t> sorted;
+    for (auto& it : calls){
+        sorted.insert({it.second.size(), it.first});
     }
-    drmgr_exit();
-    if (drreg_exit() != DRREG_SUCCESS) {
-        DRCCTLIB_PRINTF("failed to exit drreg");
+
+    auto rev_it = sorted.rbegin();
+    ofstream out("footprint.txt");
+    out << "Memory footprint of nodes, orderd by size" << endl;
+    bool total = false;
+    for(int i = 0; i < 200; i++){
+        context_t *cct = drcctlib_get_full_cct(rev_it->second, 0);
+
+        int print_num = i-2;
+        if(rev_it->second == 1 || rev_it->second == 2){
+            if(!total) {
+                out << "The total foot print of program (from " << cct->func_name
+                    << ") is " << rev_it->first << endl;
+                total = true;
+            }
+        }
+        else{
+            out << "NO. " << print_num << " memory footprint is " << rev_it->first <<
+                " bytes for " << cct->func_name << "(" << cct->line_no << "): (" <<
+                addr_to_hex((unsigned long)cct->ip) << ")" << endl;
+            out << divider << endl;
+            context_t *parent = cct->pre_ctxt;
+            int parent_handle = cct->pre_ctxt->ctxt_hndl;
+            while(parent_handle != 0){
+                out << parent->func_name << "(" << parent->line_no << "):\"" <<
+                    addr_to_hex((unsigned long) parent->ip) << ")" << parent->code_asm << "\"" << endl;
+
+                if(parent_handle!=1) {
+                    parent = parent->pre_ctxt;
+                    parent_handle = parent->ctxt_hndl;
+                }
+                else{
+                    parent_handle = 0;
+                }
+            }
+            out << divider << endl << endl;
+
+        }
+
+        //out << endl << endl;
+        rev_it++;
+
     }
-    drutil_exit();
+drcctlib_exit();
+
+if (!dr_raw_tls_cfree(tls_offs, INSTRACE_TLS_COUNT)) {
+    DRCCTLIB_EXIT_PROCESS(
+        "ERROR: drcctlib_memory_with_addr_and_refsize_clean_call dr_raw_tls_calloc fail");
 }
+if (!drmgr_unregister_thread_init_event(ClientThreadStart) ||
+    !drmgr_unregister_thread_exit_event(ClientThreadEnd) ||
+    !drmgr_unregister_tls_field(tls_idx)) {
+    DRCCTLIB_PRINTF("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call failed to "
+                    "unregister in ClientExit");
+}
+drmgr_exit();
+if (drreg_exit() != DRREG_SUCCESS) {
+    DRCCTLIB_PRINTF("failed to exit drreg");
+}
+drutil_exit();
+}
+
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -258,8 +368,10 @@ extern "C" {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
-    dr_set_client_name("DynamoRIO Client 'drcctlib_memory_with_addr_and_refsize_clean_call'",
-                       "http://dynamorio.org/issues");
+
+    dr_set_client_name(
+        "DynamoRIO Client 'drcctlib_memory_with_addr_and_refsize_clean_call'",
+        "http://dynamorio.org/issues");
     ClientInit(argc, argv);
 
     if (!drmgr_init()) {
@@ -284,10 +396,11 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
                               "drmgr_register_tls_field fail");
     }
     if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0)) {
-        DRCCTLIB_EXIT_PROCESS(
-            "ERROR: drcctlib_memory_with_addr_and_refsize_clean_call dr_raw_tls_calloc fail");
+        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
+                              "dr_raw_tls_calloc fail");
     }
-    drcctlib_init(DRCCTLIB_FILTER_MEM_ACCESS_INSTR, INVALID_FILE, InstrumentInsCallback, false);
+    drcctlib_init(DRCCTLIB_FILTER_MEM_ACCESS_INSTR, INVALID_FILE, InstrumentInsCallback,
+                  false);
     dr_register_exit_event(ClientExit);
 }
 
