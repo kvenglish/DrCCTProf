@@ -20,12 +20,16 @@ using namespace std;
 #include "drreg.h"
 #include "drutil.h"
 #include "drcctlib.h"
+#include "drcctlib_hpcviewer_format.h"
+
 
 #define DRCCTLIB_PRINTF(format, args...) \
     DRCCTLIB_PRINTF_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, ##args)
 #define DRCCTLIB_EXIT_PROCESS(format, args...)                                       \
     DRCCTLIB_CLIENT_EXIT_PROCESS_TEMPLATE("memory_with_addr_and_refsize_clean_call", \
                                           format, ##args)
+
+#define TOP_REACH_NUM_SHOW 200
 
 static int tls_idx;
 
@@ -61,7 +65,7 @@ typedef struct _parent_map {
 
 } parent_map;
 
-map<int32_t, list<unsigned long>> calls;
+map<context_handle_t, list<unsigned long>> calls;
 
 string divider = "================================================================================";
 #define TLS_MEM_REF_BUFF_SIZE 100
@@ -293,7 +297,7 @@ ClientExit(void)
         }
     }
     //put size values into multimap for sorting
-    multimap<int, int32_t> sorted;
+    multimap<int, context_handle_t> sorted;
     for (auto& it : calls){
         sorted.insert({it.second.size(), it.first});
     }
@@ -340,7 +344,41 @@ ClientExit(void)
         rev_it++;
 
     }
-drcctlib_exit();
+
+    typedef struct _output_format_t {
+        context_handle_t handle;
+        uint64_t count;
+    } output_format_t;
+
+    output_format_t *output_list =
+        (output_format_t *)dr_global_alloc(TOP_REACH_NUM_SHOW * sizeof(output_format_t));
+
+
+    long counter = 0;
+    for(auto& it : sorted){
+        while(counter < TOP_REACH_NUM_SHOW) {
+            output_list[counter].handle = it.second;
+            output_list[counter].count = it.first;
+            counter++;
+        }
+    }
+
+
+
+    vector<HPCRunCCT_t *> hpcRunNodes;
+    for (long unsigned int i = 0; i < TOP_REACH_NUM_SHOW; i++) {
+        HPCRunCCT_t *hpcRunNode = new HPCRunCCT_t();
+        hpcRunNode->ctxt_hndl_list.push_back(output_list[i].handle);
+        hpcRunNode->metric_list.push_back(output_list[i].count);
+        hpcRunNodes.push_back(hpcRunNode);
+    }
+    build_progress_custom_cct_hpurun_format(hpcRunNodes);
+    write_progress_custom_cct_hpurun_format();
+
+
+
+    hpcrun_format_exit();
+    drcctlib_exit();
 
 if (!dr_raw_tls_cfree(tls_offs, INSTRACE_TLS_COUNT)) {
     DRCCTLIB_EXIT_PROCESS(
@@ -370,9 +408,11 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
 {
 
     dr_set_client_name(
-        "DynamoRIO Client 'drcctlib_memory_with_addr_and_refsize_clean_call'",
+        "DynamoRIO Client 'drcctlib_memory_footprint'",
         "http://dynamorio.org/issues");
     ClientInit(argc, argv);
+    hpcrun_format_init(dr_get_application_name(), false);
+    hpcrun_create_metric("TOT_MEM_BYTES");
 
     if (!drmgr_init()) {
         DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
