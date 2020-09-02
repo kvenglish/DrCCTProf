@@ -106,7 +106,11 @@ ClientExit(void)
             output_list[min_idx].handle = i;
         }
     }
+
+    //Attempt to create HPC format
     output_format_t temp;
+
+    //Places
     for (int32_t i = 0; i < TOP_REACH_NUM_SHOW; i++) {
         for (int32_t j = i; j < TOP_REACH_NUM_SHOW; j++) {
             if (output_list[i].count < output_list[j].count) {

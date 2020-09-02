@@ -74,47 +74,16 @@ string divider = "==============================================================
 void
 DoWhatClientWantTodo(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
 {
-    // context_t *full_cct = drcctlib_get_full_cct(cur_ctxt_hndl, 0);
 
-    /*  //  cout << " Current Func: " << full_cct->func_name << " Path: " <<
-    full_cct->file_path << " Context: " << full_cct->ctxt_hndl << " IP: " << full_cct->ip
-    << endl;
-
-        //     if (strlen(full_cct->file_path) != 0) {
-        cout << " Current Func: " << full_cct->func_name
-             << " Context: " << full_cct->ctxt_hndl << " ASM: " << full_cct->code_asm
-                  << " LN: " << full_cct->line_no << endl;//" IP: " << full_cct->ip <<
-    endl;
-
-    //
-    //  //  if (full_cct->pre_ctxt->ctxt_hndl != 0) {
-    //
-    //
-        cout << " Pre Func: " << full_cct->pre_ctxt->func_name
-             << " Context: " << full_cct->pre_ctxt->ctxt_hndl
-             << " ASM: " << full_cct->pre_ctxt->code_asm
-             << " LN: " << full_cct->pre_ctxt->line_no << endl;//" IP: " //<<
-    full_cct->pre_ctxt->ip
-             //<< endl;
-    }*/
 
 
     list<unsigned long> mem;
-    unsigned long address = (unsigned long)ref->addr;
+    unsigned long address = (unsigned long)ref->addr; //casts starting address to long
 
-    //    for(long unsigned int i = 0; i < ref->size; i++){
-    //        mem.push_front(address);
-    //        address++;
-    //    }
-    //
-    //    address -= ref->size;
-
-//    pair<map<int, list<unsigned long>>::iterator, bool> ret =
-//        calls.insert(make_pair(cur_ctxt_hndl, mem));
-
-    // if (ret.second == false){
-    // cout << "1";
-
+    //Checks if current context 1. exists in global call map and 2. if it exists, if the
+    //memory locations exist. Searching for that specific context handle adds it if it
+    //doesn't already exist, which is default functionality of map
+    //if bytes aren't in list, pushes them to back
     for (long unsigned int i = 0; i < ref->size; i++) {
         if (find(calls[cur_ctxt_hndl].begin(), calls[cur_ctxt_hndl].end(), address) ==
             calls[cur_ctxt_hndl].end()) {
@@ -271,13 +240,19 @@ ClientExit(void)
     // add output module here
     //map<int32_t, list<unsigned long>>::iterator it = calls.begin();
 
+    //Goes through calls map and aggregates the memory footprint of each node up
+    //it's call tree
     for(auto& it : calls) {
+
+            //gets full CCT for current node
             context_t *full_cct = drcctlib_get_full_cct(it.first, 0);
             //list<unsigned long>::iterator addr_it = it.second.begin();
-            context_t *parent = full_cct->pre_ctxt;
-            int parent_handle = full_cct->pre_ctxt->ctxt_hndl;
+            context_t *parent = full_cct->pre_ctxt; //initial parrent context
+            int parent_handle = full_cct->pre_ctxt->ctxt_hndl; //initial parent context handle
             while(parent_handle != 0){
 
+                //checks if parent node has the memory bytes assigned, if not, adds them.
+                //same functionality as in DoWhatClientWantTodo
             for(auto& addr_it : it.second) {
                 if (find(calls[parent_handle].begin(), calls[parent_handle].end(),
                          addr_it) == calls[parent_handle].end()) {
@@ -286,6 +261,7 @@ ClientExit(void)
 
 
             }
+             //sets next parent, or sets 0 if at ROOT_CTXT
             if(parent_handle!=1) {
                 parent = parent->pre_ctxt;
                 parent_handle = parent->ctxt_hndl;
@@ -302,32 +278,44 @@ ClientExit(void)
         sorted.insert({it.second.size(), it.first});
     }
 
+
+    //goes through sorted multimap, and prints out the information for each node
+    //code is simply string formatting and pulling each piece of information from the
+    //node's context
     auto rev_it = sorted.rbegin();
     ofstream out("footprint.txt");
     out << "Memory footprint of nodes, orderd by size" << endl;
     bool total = false;
     for(int i = 0; i < 200; i++){
-        context_t *cct = drcctlib_get_full_cct(rev_it->second, 0);
+        context_t *cct = drcctlib_get_full_cct(rev_it->second, 0); //node's full tree
 
-        int print_num = i-2;
+        int print_num = i-2; //Starts at No. 0 for output, skipping ROOT_CTXT
+
+        //if root_ctxt or _root_ctxt, simply prints out the total memory size. This is because
+        //root_ctxt does not require a tree print, line number, etc, as it is always the same information
         if(rev_it->second == 1 || rev_it->second == 2){
             if(!total) {
                 out << "The total foot print of program (from " << cct->func_name
-                    << ") is " << rev_it->first << endl;
+                    << ") is " << rev_it->first << " bytes" << endl;
                 total = true;
             }
         }
+        //if not root context, print out memory info
         else{
             out << "NO. " << print_num << " memory footprint is " << rev_it->first <<
                 " bytes for " << cct->func_name << "(" << cct->line_no << "): (" <<
                 addr_to_hex((unsigned long)cct->ip) << ")" << endl;
             out << divider << endl;
-            context_t *parent = cct->pre_ctxt;
-            int parent_handle = cct->pre_ctxt->ctxt_hndl;
+
+            context_t *parent = cct->pre_ctxt; //gets parent context of current node
+            int parent_handle = cct->pre_ctxt->ctxt_hndl; //parent handle of current node
+
+            //prints out node call tree by going up parents
             while(parent_handle != 0){
                 out << parent->func_name << "(" << parent->line_no << "):\"" <<
                     addr_to_hex((unsigned long) parent->ip) << ")" << parent->code_asm << "\"" << endl;
 
+                //sets next parent, or sets 0 if at ROOT_CTXT
                 if(parent_handle!=1) {
                     parent = parent->pre_ctxt;
                     parent_handle = parent->ctxt_hndl;
@@ -364,14 +352,19 @@ ClientExit(void)
     }
 
 
+    //Attempt to set HPC format. I don't think it works, but I also don't know if I was connecting
+    //it correctly
+    vector<HPCRunCCT_t *> hpcRunNodes; //HPC format vector
 
-    vector<HPCRunCCT_t *> hpcRunNodes;
+    //puts sorted nodes and their memory sizes into hpc vectors
     for (long unsigned int i = 0; i < TOP_REACH_NUM_SHOW; i++) {
         HPCRunCCT_t *hpcRunNode = new HPCRunCCT_t();
         hpcRunNode->ctxt_hndl_list.push_back(output_list[i].handle);
         hpcRunNode->metric_list.push_back(output_list[i].count);
         hpcRunNodes.push_back(hpcRunNode);
     }
+
+    //builds/writes hpc file
     build_progress_custom_cct_hpurun_format(hpcRunNodes);
     write_progress_custom_cct_hpurun_format();
 
@@ -411,8 +404,8 @@ dr_client_main(client_id_t id, int argc, const char *argv[])
         "DynamoRIO Client 'drcctlib_memory_footprint'",
         "http://dynamorio.org/issues");
     ClientInit(argc, argv);
-    hpcrun_format_init(dr_get_application_name(), false);
-    hpcrun_create_metric("TOT_MEM_BYTES");
+    hpcrun_format_init(dr_get_application_name(), false); // init for hpcformat
+    hpcrun_create_metric("TOT_MEM_BYTES"); //sets metric for hpcformat
 
     if (!drmgr_init()) {
         DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
