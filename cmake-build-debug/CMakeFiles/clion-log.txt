@@ -1,4 +1,16 @@
 /home/troherg/clion-2020.2.1/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/troherg/DrCCTProf
 -- Configuring done
--- Generating done
--- Build files have been written to: /home/troherg/DrCCTProf/cmake-build-debug
+CMake Error at CMakeLists.txt:70 (add_executable):
+  Cannot find source file:
+
+    test_apps/src/test_app_cct.cpp
+
+  Tried extensions .c .C .c++ .cc .cpp .cxx .cu .m .M .mm .h .hh .h++ .hm
+  .hpp .hxx .in .txx
+
+
+CMake Error at CMakeLists.txt:70 (add_executable):
+  No SOURCES given to target: DrCCTProf
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.

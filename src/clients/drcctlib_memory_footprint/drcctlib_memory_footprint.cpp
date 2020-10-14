@@ -128,6 +128,7 @@ InstrumentMem(void *drcontext, instrlist_t *ilist, instr_t *where, opnd_t ref)
                 XINST_CREATE_load_int(drcontext, opnd_create_reg(free_reg),
                                       OPND_CREATE_CCT_INT(0)));
     }
+
     dr_insert_read_raw_tls(drcontext, ilist, where, tls_seg,
                            tls_offs + INSTRACE_TLS_OFFS_BUF_PTR, reg_mem_ref_ptr);
     // store mem_ref_t->addr
@@ -196,6 +197,14 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
             InstrumentMem(drcontext, bb, instr, instr_get_dst(instr, i));
         }
     }
+
+    for (int i = 0; i < instr_num_dsts(instr); i++) {
+        if (opnd_is_reg(instr_get_src(instr, i))) {
+            num++;
+            InstrumentMem(drcontext, bb, instr, instr_get_src(instr, i));
+        }
+    }
+
     dr_insert_clean_call(drcontext, bb, instr, (void *)InsertCleancall, false, 2,
                          OPND_CREATE_CCT_INT(slot), OPND_CREATE_CCT_INT(num));
 }

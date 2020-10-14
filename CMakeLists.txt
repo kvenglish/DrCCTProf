@@ -1180,6 +1180,7 @@ add_executable(DrCCTProf
         src/clients/drcctlib_cct_only/drcctlib_cct_only.cpp
         src/clients/drcctlib_cct_only_clean_call/drcctlib_cct_only_clean_call.cpp
         src/clients/drcctlib_cct_only_no_cache/drcctlib_cct_only_no_cache.cpp
+        src/clients/drcctlib_dead_write/drcctlib_dead_write.cpp
         src/clients/drcctlib_instr_statistics/drcctlib_instr_statistics.cpp
         src/clients/drcctlib_instr_statistics_clean_call/drcctlib_instr_statistics_clean_call.cpp
         src/clients/drcctlib_instr_statistics_hpc_fmt/drcctlib_instr_statistics_hpc_fmt.cpp
