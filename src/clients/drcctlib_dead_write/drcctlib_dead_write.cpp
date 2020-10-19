@@ -97,10 +97,11 @@ RecordDeadWrite(context_handle_t dead, context_handle_t killing, bool isRegister
     uint64 handles = PackInts(dead, killing);
     // if dead write occured in register, store in register record
     if (isRegister) {
-        if (deadRegRecord[handles])
+        if (deadRegRecord[handles]) {
             deadRegRecord[handles]++; // increment frequency if exists
-        else
+        }else {
             deadRegRecord[handles] = 1; // adds if doesn't exist
+        }
     }
     // otherwise store in mem record
     else {
@@ -145,7 +146,7 @@ ProcessMemAccess(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref
 
 
 // Process instrumented registers and store information in reg_access_record. If dead
-// write, store in dead_reg_recoord
+// write, store in dead_reg_record
 void
 InsertRegCleanCall(int32_t slot, reg_id_t reg_id, int32_t write_state)
 {
@@ -274,7 +275,7 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
             // 0 = read
             InstrumentMem(drcontext, bb, instr, instr_get_src(instr, i), 0);
         }
-        if (opnd_is_reg(instr_get_src(instr, i))) {
+        else if (opnd_is_reg(instr_get_src(instr, i))) {
             // in case multiple registers in operand
             opnd_t op = instr_get_src(instr, i);
             int num_temp = opnd_num_regs_used(op);
@@ -294,8 +295,9 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
             opnd_t op = instr_get_dst(instr, i);
             int num_temp = opnd_num_regs_used(op);
             for (int j = 0; j < num_temp; j++) {
-                reg_id_t reg_id = opnd_get_reg_used(op, j);
-                if (opnd_is_memory_reference(instr_get_dst(instr, i))) {
+                reg_id_t reg_id = opnd_get_reg_used(op, 0);
+                cout << reg_id << endl;
+                if (opnd_is_memory_reference(op)) {
                     // 0 = read
                     // insert clean call with read, reg_id, and slot
                     dr_insert_clean_call(drcontext, bb, instr, (void *)InsertRegCleanCall,
@@ -310,9 +312,9 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
                                          OPND_CREATE_CCT_INT(reg_id),
                                          OPND_CREATE_CCT_INT(1));
                 }
-            }
+           }
         }
-        if (opnd_is_memory_reference(instr_get_dst(instr, i))) {
+        else if (opnd_is_memory_reference(instr_get_dst(instr, i))) {
             num++;
             // 1 = write
             InstrumentMem(drcontext, bb, instr, instr_get_dst(instr, i), 1);
