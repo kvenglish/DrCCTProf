@@ -198,13 +198,6 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
         }
     }
 
-    for (int i = 0; i < instr_num_dsts(instr); i++) {
-        if (opnd_is_reg(instr_get_src(instr, i))) {
-            num++;
-            InstrumentMem(drcontext, bb, instr, instr_get_src(instr, i));
-        }
-    }
-
     dr_insert_clean_call(drcontext, bb, instr, (void *)InsertCleancall, false, 2,
                          OPND_CREATE_CCT_INT(slot), OPND_CREATE_CCT_INT(num));
 }

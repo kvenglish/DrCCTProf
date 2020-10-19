@@ -153,6 +153,7 @@ InsertRegCleanCall(int32_t slot, reg_id_t reg_id, int32_t write_state)
     if(write_state) totRegWrite++;
     void *drcontext = dr_get_current_drcontext();
     context_handle_t cur_ctxt_hndl = drcctlib_get_context_handle(drcontext, slot);
+    //cout << drcctlib_get_full_cct(cur_ctxt_hndl, 0)->file_path << endl;
     // check if memory location exists in map
     if (regAccessRec.find(reg_id) != regAccessRec.end()) {
         // checks if current context is a read, or if previous context was a read
@@ -296,7 +297,7 @@ InstrumentInsCallback(void *drcontext, instr_instrument_msg_t *instrument_msg)
             int num_temp = opnd_num_regs_used(op);
             for (int j = 0; j < num_temp; j++) {
                 reg_id_t reg_id = opnd_get_reg_used(op, 0);
-                cout << reg_id << endl;
+                //cout << reg_id << endl;
                 if (opnd_is_memory_reference(op)) {
                     // 0 = read
                     // insert clean call with read, reg_id, and slot
@@ -368,7 +369,7 @@ void PrintToFile(uint32_t dead, uint32_t killing, ofstream& fout){
     context_t *parent = cct->pre_ctxt; // gets parent context of current node
     int parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
 
-    fout << cct->ctxt_hndl << ":" << AddrToHex((unsigned long)cct->ip) << ":" << cct->code_asm << ":" << cct->func_name << ":" << cct->file_path << "(" << cct->line_no << ")"
+    fout << cct->ctxt_hndl << " : " << AddrToHex((unsigned long)cct->ip) << " : " << cct->code_asm << " : " << cct->func_name << " : " << cct->file_path << "(" << cct->line_no << ")"
          << endl;
     // prints out node call tree by going up parents
     while (parent_handle != 0) {
@@ -376,7 +377,7 @@ void PrintToFile(uint32_t dead, uint32_t killing, ofstream& fout){
             fout << "  ";
         }
 
-        fout << parent->ctxt_hndl << ":" << AddrToHex((unsigned long)parent->ip) << ":" << parent->code_asm << ":" << parent->func_name << ":" << parent->file_path << "(" << parent->line_no << ")"
+        fout << parent->ctxt_hndl << " : " << AddrToHex((unsigned long)parent->ip) << " : " << parent->code_asm << " : " << parent->func_name << " : " << dec << parent->file_path << "(" << parent->line_no << ")"
              << endl;
         // sets next parent, or sets 0 if at ROOT_CTXT
         if (parent_handle != 1) {
@@ -396,15 +397,15 @@ void PrintToFile(uint32_t dead, uint32_t killing, ofstream& fout){
     parent = cct->pre_ctxt; // gets parent context of current node
     parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
 
-    fout << cct->ctxt_hndl << ":" << cct->code_asm << ":" << cct->func_name << cct->file_path << "(" << cct->line_no << "):\""
-         << AddrToHex((unsigned long)cct->ip) << ":" << cct->code_asm << endl;
+    fout << cct->ctxt_hndl << " : " << AddrToHex((unsigned long)cct->ip) << " : " << cct->code_asm << " : " << cct->func_name << " : " << cct->file_path << "(" << cct->line_no << ")"
+         << endl;
     // prints out node call tree by going up parents
     while (parent_handle != 0) {
         string dblSpace = "  ";
         for(int j=0; j<lineCount+1; j++){
             fout << "  ";
         }
-        fout << parent->ctxt_hndl << ":" << AddrToHex((unsigned long)parent->ip) << ":" << parent->code_asm << ":" << parent->func_name << ":" << parent->file_path << "(" << parent->line_no << ")"
+        fout << parent->ctxt_hndl << " : " << AddrToHex((unsigned long)parent->ip) << " : " << parent->code_asm << ": " << parent->func_name << " : " << parent->file_path << "(" << parent->line_no << ")"
              << endl;
 
         // sets next parent, or sets 0 if at ROOT_CTXT
