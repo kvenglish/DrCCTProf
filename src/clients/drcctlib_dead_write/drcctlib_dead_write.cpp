@@ -357,6 +357,67 @@ static string AddrToHex(unsigned long addr){
     return hex_addr.str();
 }
 
+void PrintToFile(uint32_t dead, uint32_t killing, ofstream& fout){
+
+    int lineCount = 0;
+    //Dead context's output
+    context_t *cct = drcctlib_get_full_cct(dead, 0); // deads's full tree
+
+    context_t *parent = cct->pre_ctxt; // gets parent context of current node
+    int parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
+
+    fout << cct->ctxt_hndl << ":" << AddrToHex((unsigned long)cct->ip) << ":" << cct->code_asm << ":" << cct->func_name << ":" << cct->file_path << "(" << cct->line_no << ")"
+         << endl;
+    // prints out node call tree by going up parents
+    while (parent_handle != 0) {
+        for(int j=0; j<lineCount+1; j++){
+            fout << "  ";
+        }
+
+        fout << parent->ctxt_hndl << ":" << AddrToHex((unsigned long)parent->ip) << ":" << parent->code_asm << ":" << parent->func_name << ":" << parent->file_path << "(" << parent->line_no << ")"
+             << endl;
+        // sets next parent, or sets 0 if at ROOT_CTXT
+        if (parent_handle != 1) {
+            parent = parent->pre_ctxt;
+            parent_handle = parent->ctxt_hndl;
+        } else {
+            parent_handle = 0;
+        }
+        lineCount++;
+    }
+    fout << writeDiv << endl << endl;
+
+    lineCount = 0;
+    //Killing context output
+    cct = drcctlib_get_full_cct(killing, 0); // deads's full tree
+
+    parent = cct->pre_ctxt; // gets parent context of current node
+    parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
+
+    fout << cct->ctxt_hndl << ":" << cct->code_asm << ":" << cct->func_name << cct->file_path << "(" << cct->line_no << "):\""
+         << AddrToHex((unsigned long)cct->ip) << ":" << cct->code_asm << endl;
+    // prints out node call tree by going up parents
+    while (parent_handle != 0) {
+        string dblSpace = "  ";
+        for(int j=0; j<lineCount+1; j++){
+            fout << "  ";
+        }
+        fout << parent->ctxt_hndl << ":" << AddrToHex((unsigned long)parent->ip) << ":" << parent->code_asm << ":" << parent->func_name << ":" << parent->file_path << "(" << parent->line_no << ")"
+             << endl;
+
+        // sets next parent, or sets 0 if at ROOT_CTXT
+        if (parent_handle != 1) {
+            parent = parent->pre_ctxt;
+            parent_handle = parent->ctxt_hndl;
+        } else {
+            parent_handle = 0;
+        }
+        lineCount++;
+    }
+    fout << divider << endl << endl;
+    return;
+}
+
 void OutputRegLog(){
     //put dead write map into multimap to sort, because C++ probably sorts better than
     //I do
@@ -386,65 +447,11 @@ void OutputRegLog(){
     for (int i = 1; i < 101; i++) {
         tie(dead, killing) = UnpackInts(rev_it->second);
         //cout << dead << " k: " << killing << endl;
-
         fout << "NO. " << i << " dead write total is " << rev_it->first
              << " (" << (float) rev_it->first/totDeadWrite*100.00 << ")" << endl;
         fout << divider << endl;
+        PrintToFile(dead, killing, fout);
 
-        int lineCount = 0;
-        //Dead context's output
-        context_t *cct = drcctlib_get_full_cct(dead, 0); // deads's full tree
-
-        context_t *parent = cct->pre_ctxt; // gets parent context of current node
-        int parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
-
-        // prints out node call tree by going up parents
-        while (parent_handle != 0) {
-            for(int j=0; j<lineCount; j++){
-                fout << "  ";
-            }
-            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
-                 << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
-                 << "\"" << endl;
-
-            // sets next parent, or sets 0 if at ROOT_CTXT
-            if (parent_handle != 1) {
-                parent = parent->pre_ctxt;
-                parent_handle = parent->ctxt_hndl;
-            } else {
-                parent_handle = 0;
-            }
-            lineCount++;
-        }
-        fout << writeDiv << endl << endl;
-
-        lineCount = 0;
-        //Killing context output
-        cct = drcctlib_get_full_cct(killing, 0); // deads's full tree
-
-        parent = cct->pre_ctxt; // gets parent context of current node
-        parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
-
-        // prints out node call tree by going up parents
-        while (parent_handle != 0) {
-            string dblSpace = "  ";
-            for(int j=0; j<lineCount; j++){
-                fout << "  ";
-            }
-            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
-                 << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
-                 << "\"" << endl;
-
-            // sets next parent, or sets 0 if at ROOT_CTXT
-            if (parent_handle != 1) {
-                parent = parent->pre_ctxt;
-                parent_handle = parent->ctxt_hndl;
-            } else {
-                parent_handle = 0;
-            }
-            lineCount++;
-        }
-        fout << divider << endl << endl;
         rev_it++;
     }
 }
@@ -484,61 +491,62 @@ void OutputMemLog(){
         fout << "NO. " << i << " dead write total is " << rev_it->first
             << " (" << (float) rev_it->first/totDeadWrite*100.00 << ")" << endl;
         fout << divider << endl;
-
-        int lineCount = 0;
-        //Dead context's output
-        context_t *cct = drcctlib_get_full_cct(dead, 0); // deads's full tree
-
-        context_t *parent = cct->pre_ctxt; // gets parent context of current node
-        int parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
-
-        // prints out node call tree by going up parents
-        while (parent_handle != 0) {
-            for(int j=0; j<lineCount; j++){
-                fout << "  ";
-            }
-            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
-                << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
-                << "\"" << endl;
-
-            // sets next parent, or sets 0 if at ROOT_CTXT
-            if (parent_handle != 1) {
-                parent = parent->pre_ctxt;
-                parent_handle = parent->ctxt_hndl;
-            } else {
-                parent_handle = 0;
-            }
-            lineCount++;
-        }
-        fout << writeDiv << endl << endl;
-
-        lineCount = 0;
-        //Killing context output
-        cct = drcctlib_get_full_cct(killing, 0); // deads's full tree
-
-        parent = cct->pre_ctxt; // gets parent context of current node
-        parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
-
-        // prints out node call tree by going up parents
-        while (parent_handle != 0) {
-            string dblSpace = "  ";
-            for(int j=0; j<lineCount; j++){
-                fout << "  ";
-            }
-            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
-                 << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
-                 << "\"" << endl;
-
-            // sets next parent, or sets 0 if at ROOT_CTXT
-            if (parent_handle != 1) {
-                parent = parent->pre_ctxt;
-                parent_handle = parent->ctxt_hndl;
-            } else {
-                parent_handle = 0;
-            }
-            lineCount++;
-        }
-        fout << divider << endl << endl;
+        PrintToFile(dead, killing, fout);
+//
+//        int lineCount = 0;
+//        //Dead context's output
+//        context_t *cct = drcctlib_get_full_cct(dead, 0); // deads's full tree
+//
+//        context_t *parent = cct->pre_ctxt; // gets parent context of current node
+//        int parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
+//
+//        // prints out node call tree by going up parents
+//        while (parent_handle != 0) {
+//            for(int j=0; j<lineCount; j++){
+//                fout << "  ";
+//            }
+//            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
+//                << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
+//                << "\"" << endl;
+//
+//            // sets next parent, or sets 0 if at ROOT_CTXT
+//            if (parent_handle != 1) {
+//                parent = parent->pre_ctxt;
+//                parent_handle = parent->ctxt_hndl;
+//            } else {
+//                parent_handle = 0;
+//            }
+//            lineCount++;
+//        }
+//        fout << writeDiv << endl << endl;
+//
+//        lineCount = 0;
+//        //Killing context output
+//        cct = drcctlib_get_full_cct(killing, 0); // deads's full tree
+//
+//        parent = cct->pre_ctxt; // gets parent context of current node
+//        parent_handle = cct->pre_ctxt->ctxt_hndl; // parent handle of current node
+//
+//        // prints out node call tree by going up parents
+//        while (parent_handle != 0) {
+//            string dblSpace = "  ";
+//            for(int j=0; j<lineCount; j++){
+//                fout << "  ";
+//            }
+//            fout << parent->file_path << ":" << parent->func_name << "(" << parent->line_no << "):\""
+//                 << AddrToHex((unsigned long)parent->ip) << ")" << parent->code_asm
+//                 << "\"" << endl;
+//
+//            // sets next parent, or sets 0 if at ROOT_CTXT
+//            if (parent_handle != 1) {
+//                parent = parent->pre_ctxt;
+//                parent_handle = parent->ctxt_hndl;
+//            } else {
+//                parent_handle = 0;
+//            }
+//            lineCount++;
+//        }
+//        fout << divider << endl << endl;
         rev_it++;
     }
 
