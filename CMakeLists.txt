@@ -1185,6 +1185,7 @@ add_executable(DrCCTProf
         src/clients/drcctlib_instr_statistics_clean_call/drcctlib_instr_statistics_clean_call.cpp
         src/clients/drcctlib_instr_statistics_hpc_fmt/drcctlib_instr_statistics_hpc_fmt.cpp
         src/clients/drcctlib_memory_footprint/drcctlib_memory_footprint.cpp
+        src/clients/drcctlib_heap_overflow/drcctlib_heap_overflow.cpp
         src/clients/drcctlib_memory_only/drcctlib_memory_only.cpp
         src/clients/drcctlib_memory_only_clean_call/drcctlib_memory_only_clean_call.cpp
         src/clients/drcctlib_memory_with_addr_and_refsize_clean_call/drcctlib_memory_with_addr_and_refsize_clean_call.cpp

@@ -12,12 +12,35 @@
 #include "drutil.h"
 #include "drcctlib.h"
 #include "drwrap.h"
+#include "map"
+#include <stdio.h>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include "stack"
+#include <fstream>
+#include <sstream>
+
+using namespace std;
 
 #define DRCCTLIB_PRINTF(format, args...) \
-    DRCCTLIB_PRINTF_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, ##args)
+    DRCCTLIB_PRINTF_TEMPLATE("heap_overflow", format, ##args)
 #define DRCCTLIB_EXIT_PROCESS(format, args...)                                           \
-    DRCCTLIB_CLIENT_EXIT_PROCESS_TEMPLATE("memory_with_addr_and_refsize_clean_call", format, \
+    DRCCTLIB_CLIENT_EXIT_PROCESS_TEMPLATE("heap_overflow", format, \
                                           ##args)
+
+
+//Checks if Windows, if yes choose left parameter
+
+#ifdef WINDOWS
+#    define IF_WINDOWS_ELSE(x, y) x
+#else
+#    define IF_WINDOWS_ELSE(x, y) y
+#endif
+
+#define MALLOC_ROUTINE_NAME IF_WINDOWS_ELSE("HeapAlloc", "malloc")
+#define FREE_ROUTINE_NAME IF_WINDOWS_ELSE("HeapFree", "free")
+
 
 static int tls_idx;
 
@@ -46,13 +69,116 @@ typedef struct _per_thread_t {
     void *cur_buf;
 } per_thread_t;
 
+size_t redzone_size;
+static void *size_lock; //locks redzone size so size does not get overwritten before post call
+
+typedef struct _zone_info {
+    context_handle_t ctxt_hndl;
+    app_pc base_addr;
+} zone_info;
+
+typedef struct _violation_info {
+    context_handle_t vio_ctxt; // violating context
+    context_handle_t red_ctxt; // redzone context
+    app_pc red_addr; // redzone address
+} violation_info;
+
+map<app_pc , zone_info> redzone; // <Redzone address, <redzone context, heap base>>
+stack<violation_info> violations; // Stack holding violations
+
 #define TLS_MEM_REF_BUFF_SIZE 100
 
-// client want to do
+
+
+static void
+prewrap_malloc(void *wrapcxt OUT,  void **user_data)
+{
+    /* malloc(size) or HeapAlloc(heap, flags, size) */
+    size_t size = (size_t)drwrap_get_arg(wrapcxt, IF_WINDOWS_ELSE(2, 0));
+    *user_data = (void *) size; //save based size, since 0 index means addr+size is after array
+
+    //add 5 to make 5 wide redzone
+    drwrap_set_arg(wrapcxt, IF_WINDOWS_ELSE(2, 0), (void*) (size + 5));
+     //cout << "Pre Success; Size: " << size << endl;
+
+}
+
+
+static void
+postwrap_malloc(void *wrapctxt , void *user_data)
+{
+    void *context = drwrap_get_drcontext(wrapctxt); // get drcontext for post
+    context_handle_t curr_ctxt =
+        drcctlib_get_context_handle(context, 0); // get current context from dr context
+    app_pc base_addr = (app_pc)drwrap_get_retval(
+        wrapctxt); // get return value of malloc (pointer to base)
+
+    //Create 5 byte wide redzone
+    for (int i = 0; i < 5; i++) {
+        app_pc redzone_addr = base_addr + (unsigned long)user_data; // redzone address
+        redzone[redzone_addr].ctxt_hndl = curr_ctxt; // add context to redzone map
+        redzone[redzone_addr].base_addr = base_addr; // add base address to redzone map
+        // cout << "Post Success; Size: " << (unsigned long) user_data << " Redzone: " << (unsigned long) redzone_addr << " Base: " << (unsigned long) base_addr << " Context: " << curr_ctxt << endl;
+    }
+}
+
+static void prewrap_free(void *wrapctxt OUT, void **user_data){
+    //grabs the base pointer of area to be freed to be passed to post function.
+    // redzone not removed from map until post to confirm free executed properly
+    *user_data = (void *)drwrap_get_arg(wrapctxt, IF_WINDOWS_ELSE(0, 0)); // IF_WINDOWS_ELSE not needed, as Handle is the 0th variable. In place for consistency
+}
+
+static void postwrap_free(void *wrapctxt, void *user_data){
+    for(auto& it : redzone){
+        if(it.second.base_addr == (app_pc) user_data){
+            int success = redzone.erase(it.first);
+            //cout << "Free erase " << success << endl;
+        }
+    }
+}
+
+static void module_load_event(void *drcontext, const module_data_t *mod, bool loaded){
+    app_pc freewrap = (app_pc)dr_get_proc_address(mod->handle, FREE_ROUTINE_NAME);
+    app_pc mallwrap = (app_pc)dr_get_proc_address(mod->handle, MALLOC_ROUTINE_NAME);
+    //cout << mod->handle << endl;
+    if(freewrap != NULL) {
+        // cout << mod->names.file_name << endl;
+        //cout << "Free wrapped" << endl;
+        drwrap_wrap(freewrap, prewrap_free, postwrap_free);
+    }
+
+    if(mallwrap != NULL){
+        drwrap_wrap(mallwrap, prewrap_malloc, postwrap_malloc);
+    }
+
+}
+
+// Check memory access against Redzone
 void
 CheckRedzone(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
 {
-    // add online analysis here
+    app_pc addr;
+
+    //checks the entire size of the access reference instead of just the base. This is because
+    //even if it is not a direct redzone access, the access is a violation. Just because you use
+    //only the first byte of an integer or other memory primitive, if the rest of it extends into
+    //an overflow, it can be a security issue
+    for(unsigned long i = 0; i < ref->size; i++) {
+        addr = ref->addr + i; //violating address/redzone map key
+        if (redzone.find(addr) != redzone.end()) {
+            context_t *context = drcctlib_get_full_cct(cur_ctxt_hndl, 0);
+            /* cout << "Redzone hit, Redzone Info: " << redzone[ref->addr + i].ctxt_hndl
+                 << " Address: " << (unsigned long)ref->addr + i << " i: " << i << endl;
+               */
+
+            violation_info hold;
+            hold.red_addr = addr;
+            hold.red_ctxt = redzone[addr].ctxt_hndl;
+            hold.vio_ctxt = cur_ctxt_hndl;
+            violations.push(hold);
+        }
+
+    }
     
 }
 // dr clean call
@@ -186,22 +312,42 @@ ClientInit(int argc, const char *argv[])
     
 }
 
+static string AddrToHex(unsigned long addr){
+    stringstream hex_addr;
+    hex_addr << "0x" << setfill('0') << setw(sizeof(addr)*2) << std::hex << addr;
+    return hex_addr.str();
+}
+
 static void
 ClientExit(void)
 {
-    // add output module here
+    string app_name = dr_get_application_name();
+    string filename = "Redzone_Violations_" + (string) dr_get_application_name() + ".txt.";
+    ofstream fout(filename);
+    int count = 0;
+    while(!violations.empty()){
+        count++;
+        violation_info top = violations.top();
+        fout << "Redzone Violation " << count << ": Redzone Context=" << top.red_ctxt
+             << " Violating Context=" << top.vio_ctxt << " Address="
+             << AddrToHex((unsigned long) top.red_addr) << endl;
+        violations.pop();
+    }
     drcctlib_exit();
 
     if (!dr_raw_tls_cfree(tls_offs, INSTRACE_TLS_COUNT)) {
         DRCCTLIB_EXIT_PROCESS(
-            "ERROR: drcctlib_memory_with_addr_and_refsize_clean_call dr_raw_tls_calloc fail");
+            "ERROR: drcctlib_heap_overflow dr_raw_tls_calloc fail");
     }
     if (!drmgr_unregister_thread_init_event(ClientThreadStart) ||
         !drmgr_unregister_thread_exit_event(ClientThreadEnd) ||
         !drmgr_unregister_tls_field(tls_idx)) {
-        DRCCTLIB_PRINTF("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call failed to "
+        DRCCTLIB_PRINTF("ERROR: drcctlib_heap_overflow failed to "
                         "unregister in ClientExit");
     }
+    dr_mutex_destroy(size_lock);
+    drwrap_exit();
+    drwrap_exit();
     drmgr_exit();
     if (drreg_exit() != DRREG_SUCCESS) {
         DRCCTLIB_PRINTF("failed to exit drreg");
@@ -216,35 +362,41 @@ extern "C" {
 DR_EXPORT void
 dr_client_main(client_id_t id, int argc, const char *argv[])
 {
-    dr_set_client_name("DynamoRIO Client 'drcctlib_memory_with_addr_and_refsize_clean_call'",
+    dr_set_client_name("DynamoRIO Client 'drcctlib_heap_overflow'",
                        "http://dynamorio.org/issues");
     ClientInit(argc, argv);
 
     if (!drmgr_init()) {
-        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
+        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_heap_overflow "
                               "unable to initialize drmgr");
     }
     drreg_options_t ops = { sizeof(ops), 4 /*max slots needed*/, false };
     if (drreg_init(&ops) != DRREG_SUCCESS) {
-        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
+        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_heap_overflow "
                               "unable to initialize drreg");
     }
     if (!drutil_init()) {
-        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
+        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_heap_overflow "
                               "unable to initialize drutil");
     }
+    drwrap_init();
+
     drmgr_register_thread_init_event(ClientThreadStart);
     drmgr_register_thread_exit_event(ClientThreadEnd);
 
     tls_idx = drmgr_register_tls_field();
     if (tls_idx == -1) {
-        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_memory_with_addr_and_refsize_clean_call "
+        DRCCTLIB_EXIT_PROCESS("ERROR: drcctlib_heap_overflow "
                               "drmgr_register_tls_field fail");
     }
     if (!dr_raw_tls_calloc(&tls_seg, &tls_offs, INSTRACE_TLS_COUNT, 0)) {
         DRCCTLIB_EXIT_PROCESS(
-            "ERROR: drcctlib_memory_with_addr_and_refsize_clean_call dr_raw_tls_calloc fail");
+            "ERROR: drcctlib_heap_overflow dr_raw_tls_calloc fail");
     }
+
+    drmgr_register_module_load_event(module_load_event);
+    size_lock = dr_mutex_create();
+
     drcctlib_init(DRCCTLIB_FILTER_MEM_ACCESS_INSTR, INVALID_FILE, InstrumentInsCallback, false);
     dr_register_exit_event(ClientExit);
 }

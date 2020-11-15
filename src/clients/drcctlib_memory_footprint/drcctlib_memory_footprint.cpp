@@ -72,7 +72,7 @@ string divider = "==============================================================
 
 // client want to do
 void
-DoWhatClientWantTodo(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
+CheckRedzone(void *drcontext, context_handle_t cur_ctxt_hndl, mem_ref_t *ref)
 {
 
 
@@ -104,7 +104,7 @@ InsertCleancall(int32_t slot, int32_t num)
     context_handle_t cur_ctxt_hndl = drcctlib_get_context_handle(drcontext, slot);
     for (int i = 0; i < num; i++) {
         if (pt->cur_buf_list[i].addr != 0) {
-            DoWhatClientWantTodo(drcontext, cur_ctxt_hndl, &pt->cur_buf_list[i]);
+            CheckRedzone(drcontext, cur_ctxt_hndl, &pt->cur_buf_list[i]);
         }
     }
     BUF_PTR(pt->cur_buf, mem_ref_t, INSTRACE_TLS_OFFS_BUF_PTR) = pt->cur_buf_list;

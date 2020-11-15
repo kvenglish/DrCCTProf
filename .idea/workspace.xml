@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated>
+      <config projectName="DrCCTProf" targetName="DrCCTProf" />
+    </generated>
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="fbb88cd4-f3dd-4336-b229-cf850a5cdf8a" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dynamorio" beforeDir="false" afterPath="$PROJECT_DIR$/dynamorio" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dynamorio/ext/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/dynamorio/ext/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/clients/drcctlib_memory_footprint/drcctlib_memory_footprint.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/clients/drcctlib_memory_footprint/drcctlib_memory_footprint.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/clients/drcctlib_memory_with_addr_and_refsize_clean_call/drcctlib_memory_with_addr_and_refsize_clean_call.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/clients/drcctlib_memory_with_addr_and_refsize_clean_call/drcctlib_memory_with_addr_and_refsize_clean_call.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test" beforeDir="false" afterPath="$PROJECT_DIR$/test" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test1" beforeDir="false" afterPath="$PROJECT_DIR$/test1" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1jm6gkiUUCo0VcFLIs2XpfX1c5m" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="cf.advertisement.text.overridden" value="true" />
+    <property name="cf.first.check.clang-format" value="false" />
+  </component>
+  <component name="RunManager">
+    <configuration name="DrCCTProf" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="DrCCTProf" TARGET_NAME="DrCCTProf" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="DrCCTProf" RUN_TARGET_NAME="DrCCTProf">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="fbb88cd4-f3dd-4336-b229-cf850a5cdf8a" name="Default Changelist" comment="" />
+      <created>1604397042361</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1604397042361</updated>
+      <workItem from="1604397042637" duration="3065000" />
+      <workItem from="1604759755501" duration="15025000" />
+      <workItem from="1605193502544" duration="22571000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="979" y="323" width="672" height="678" key="search.everywhere.popup" timestamp="1605197699218">
+      <screen x="72" y="27" width="2488" height="1308" />
+    </state>
+    <state x="979" y="323" width="672" height="678" key="search.everywhere.popup/72.27.2488.1308@72.27.2488.1308" timestamp="1605197699218" />
+  </component>
+</project>
